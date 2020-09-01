@@ -1,111 +1,261 @@
 const express = require('express');
-let verificaToken = require('../meddlewares/autenticacion').verificaToken;
-let verificaAdminRole = require('../meddlewares/autenticacion').verificaAdminRole;
-const app = express();
-let Producto = require('../models/producto.js');
 
-// ============================================
-//     Mostrar los productos
-// ============================================
+const { verificaToken } = require('../middlewares/autenticacion');
 
-app.get('/producto', verificaToken, (req, res) => {
-    Categoria.find({})
-        .sort('nombre')
+
+let app = express();
+let Producto = require('../models/producto');
+
+
+// ===========================
+//  Obtener productos
+// ===========================
+app.get('/productos', verificaToken, (req, res) => {
+    // trae todos los productos
+    // populate: usuario categoria
+    // paginado
+
+    let desde = req.query.desde || 0;
+    desde = Number(desde);
+
+    Producto.find({ disponible: true })
+        .skip(desde)
+        .limit(5)
         .populate('usuario', 'nombre email')
-        .populate('categoria')
+        .populate('categoria', 'descripcion')
         .exec((err, productos) => {
+
             if (err) {
-                return res.status(400).json({
+                return res.status(500).json({
                     ok: false,
                     err
                 });
+            }
 
-            };
-
-            //Categoria.countDocuments((err, conteo) => {
             res.json({
                 ok: true,
                 productos
-
             });
 
 
+        })
 
-            //});
-        });
 });
 
-// ============================================
-//     Mostrar una Producto por ID
-// ============================================
-
-app.get('/producto/:id', verificaToken, (req, res) => {
+// ===========================
+//  Obtener un producto por ID
+// ===========================
+app.get('/productos/:id', (req, res) => {
+    // populate: usuario categoria
+    // paginado
     let id = req.params.id;
-    Producto.findById(id, (err, productoDB) => {
-        if (err) {
-            return res.status(500).json({
-                ok: false,
-                err
+
+    Producto.findById(id)
+        .populate('usuario', 'nombre email')
+        .populate('categoria', 'nombre')
+        .exec((err, productoDB) => {
+
+            if (err) {
+                return res.status(500).json({
+                    ok: false,
+                    err
+                });
+            }
+
+            if (!productoDB) {
+                return res.status(400).json({
+                    ok: false,
+                    err: {
+                        message: 'ID no existe'
+                    }
+                });
+            }
+
+            res.json({
+                ok: true,
+                producto: productoDB
             });
-
-        };
-
-
-        if (!productoDB) {
-            return res.status(400).json({
-                ok: false,
-                error: {
-                    message: 'Producto no encontrado'
-                }
-            });
-
-        }
-        res.json({
-            ok: true,
-            productos: productoDB
 
         });
 
+});
+
+// ===========================
+//  Buscar productos
+// ===========================
+app.get('/productos/buscar/:termino', verificaToken, (req, res) => {
+
+    let termino = req.params.termino;
+
+    let regex = new RegExp(termino, 'i');
+
+    Producto.find({ nombre: regex })
+        .populate('categoria', 'nombre')
+        .exec((err, productos) => {
 
 
-    });
+            if (err) {
+                return res.status(500).json({
+                    ok: false,
+                    err
+                });
+            }
+
+            res.json({
+                ok: true,
+                productos
+            })
+
+        })
 
 
 });
 
-// ============================================
-//     Crear un Producto
-// ============================================
 
-app.post('/producto', [verificaToken], (req, res) => {
+
+// ===========================
+//  Crear un nuevo producto
+// ===========================
+app.post('/productos', verificaToken, (req, res) => {
+    // grabar el usuario
+    // grabar una categoria del listado 
 
     let body = req.body;
-    console.log('descrip ', body.descripcion);
 
     let producto = new Producto({
+        usuario: req.usuario._id,
         nombre: body.nombre,
-        descripcion: body.descripcion,
         precioUni: body.precioUni,
+        descripcion: body.descripcion,
         disponible: body.disponible,
-        categoria: body.categoria,
-        usuario: req.usuario._id
+        categoria: body.categoria
     });
 
     producto.save((err, productoDB) => {
+
         if (err) {
             return res.status(500).json({
                 ok: false,
                 err
             });
+        }
 
-        };
-
-        console.log(body.descripcion);
-        //usuario.password = null;
-        res.json({
+        res.status(201).json({
             ok: true,
             producto: productoDB
         });
 
     });
+
 });
+
+// ===========================
+//  Actualizar un producto
+// ===========================
+app.put('/productos/:id', verificaToken, (req, res) => {
+    // grabar el usuario
+    // grabar una categoria del listado 
+
+    let id = req.params.id;
+    let body = req.body;
+
+    Producto.findById(id, (err, productoDB) => {
+
+        if (err) {
+            return res.status(500).json({
+                ok: false,
+                err
+            });
+        }
+
+        if (!productoDB) {
+            return res.status(400).json({
+                ok: false,
+                err: {
+                    message: 'El ID no existe'
+                }
+            });
+        }
+
+        productoDB.nombre = body.nombre;
+        productoDB.precioUni = body.precioUni;
+        productoDB.categoria = body.categoria;
+        productoDB.disponible = body.disponible;
+        productoDB.descripcion = body.descripcion;
+
+        productoDB.save((err, productoGuardado) => {
+
+            if (err) {
+                return res.status(500).json({
+                    ok: false,
+                    err
+                });
+            }
+
+            res.json({
+                ok: true,
+                producto: productoGuardado
+            });
+
+        });
+
+    });
+
+
+});
+
+// ===========================
+//  Borrar un producto
+// ===========================
+app.delete('/productos/:id', verificaToken, (req, res) => {
+
+    let id = req.params.id;
+
+    Producto.findById(id, (err, productoDB) => {
+
+        if (err) {
+            return res.status(500).json({
+                ok: false,
+                err
+            });
+        }
+
+        if (!productoDB) {
+            return res.status(400).json({
+                ok: false,
+                err: {
+                    message: 'ID no existe'
+                }
+            });
+        }
+
+        productoDB.disponible = false;
+
+        productoDB.save((err, productoBorrado) => {
+
+            if (err) {
+                return res.status(500).json({
+                    ok: false,
+                    err
+                });
+            }
+
+            res.json({
+                ok: true,
+                producto: productoBorrado,
+                mensaje: 'Producto borrado'
+            });
+
+        })
+
+    })
+
+
+});
+
+
+
+
+
+
+module.exports = app;
