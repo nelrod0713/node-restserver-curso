@@ -5,7 +5,7 @@ app.use(require('./usuario'));
 
 app.use(require('./categoria'));
 app.use(require('./login'));
-//app.use(require('./producto'));
+app.use(require('./producto'));
 
 
 
