@@ -1,6 +1,6 @@
 const express = require('express');
 
-const bcrypt = require('bcrypt');
+//const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 const { OAuth2Client } = require('google-auth-library');
@@ -18,6 +18,7 @@ app.post('/login', (req, res) => {
 
     let body = req.body;
 
+    console.log(body.password, body.email)
     Usuario.findOne({ email: body.email }, (err, usuarioDB) => {
 
         if (err) {
@@ -36,8 +37,10 @@ app.post('/login', (req, res) => {
             });
         }
 
+        console.log('2', usuarioDB.password)
 
-        if (!bcrypt.compareSync(body.password, usuarioDB.password)) {
+        //if (!bcrypt.compareSync(body.password, usuarioDB.password)) {
+        if (!body.password === usuarioDB.password) {
             return res.status(400).json({
                 ok: false,
                 err: {
